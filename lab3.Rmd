@@ -29,6 +29,245 @@ solution ...
 
 # Task 3
 
-task ...
+**Task**:
 
-solution ...
+(a) write the code to find the variance for the dataset;
+
+(b) find σ²ₙ and σ²ₙ₋₁ for n = 10, n = 50, n = 100, n = 1000;
+
+(c) find the biases Bias(σ²ₙ) = E(σ²ₙ) − σ² and Bias(σ²ₙ₋₁) = E(σ²ₙ₋₁) − σ²;
+
+(d) comment on the results for the different values of n;
+
+(e) derive analytically the expected value of each estimator E(σ²ₙ) and E(σ²ₙ₋₁);
+
+(f) using the expected values found above, show mathematically what of the above two estimators are unbiased;
+
+(g) comment on the results behind theoretical and practical tasks.
+
+**Solution**:
+
+**(a)**
+
+```{r}
+set.seed(42)
+n <- 5000
+mu <- 10
+sigma_squared <- 4
+sigma <- sqrt(sigma_squared)
+dataset <- rnorm(n, mean = mu, sd = sigma)
+head(dataset)
+cat("Population Mean (mu):", mu, "\n")
+cat("Population Variance (sigma_squared):", sigma_squared, "\n")
+sample_mean <- mean(dataset)
+sample_variance <- var(dataset)
+cat("Sample Mean:", sample_mean, "\n")
+cat("Sample Variance:", sample_variance, "\n")
+```
+
+**(b)**
+
+```{r}
+# σ_n^
+sigma2_n <- mean((dataset - sample_mean)^2)
+
+# σ_{n-1}^2
+sigma2_n1 <- sum((dataset - sample_mean)^2) / (n - 1)
+
+cat("sigma2_n   =", sigma2_n,  "\n")
+cat("sigma2_n-1 =", sigma2_n1, "\n")
+
+```
+
+**(c)**
+
+```{r}
+bias_sigma_n   <- sigma2_n  - sigma_squared
+bias_sigma_n1  <- sigma2_n1 - sigma_squared
+
+cat("Bias(sigma_n^2)   =", bias_sigma_n,  "\n")
+cat("Bias(sigma_n-1^2) =", bias_sigma_n1, "\n")
+
+```
+
+**(d)**\
+As the sample size *n* increases, both estimators become more stable and approach the true population variance.\
+This behavior is totally expected due to the law of large numbers.\
+Here are some graphs that show the change of the bias value the bigger the dataset is:
+
+```{r}
+set.seed(42)
+
+# true variance
+sigma2_true <- 4
+sigma <- sqrt(sigma2_true)
+mu <- 10
+
+# sample sizes
+ns <- c(10, 20, 50, 100, 200, 500, 1000)
+
+# number of simulations
+S <- 5000
+
+bias_n <- numeric(length(ns))
+bias_n1 <- numeric(length(ns))
+
+for (i in seq_along(ns)) {
+  n <- ns[i]
+  
+  # simulate S samples of size n
+  X <- matrix(rnorm(S * n, mean = mu, sd = sigma), nrow = S)
+  
+  means <- rowMeans(X)
+  
+  # biased estimator: divide by n
+  sigma2_n <- rowMeans((X - means)^2)
+  
+  # unbiased estimator: divide by n - 1
+  sigma2_n1 <- rowSums((X - means)^2) / (n - 1)
+  
+  bias_n[i]  <- mean(sigma2_n  - sigma2_true)
+  bias_n1[i] <- mean(sigma2_n1 - sigma2_true)
+}
+
+# plot
+plot(
+  ns, bias_n, type = "o", pch = 16, col = "orange",
+  xlab = "Sample size n", ylab = "Bias",
+  main = "Bias of Variance Estimators vs Sample Size",
+  ylim = range(c(bias_n, bias_n1, 0))
+)
+lines(ns, bias_n1, type = "o", pch = 16, col = "steelblue")
+
+abline(h = 0, lty = 2)
+
+```
+
+**(e) and (f)**
+
+Assume that $X_1, \dots, X_n$ are i.i.d. random variables with $$
+\mathbb{E}[X_i] = \mu, \qquad \mathrm{Var}(X_i) = \sigma^2,
+$$ and let $$
+\bar X = \frac{1}{n}\sum_{i=1}^n X_i
+$$ be the sample mean.
+
+We consider two estimators of the population variance $\sigma^2$: $$
+\sigma_n^2   = \frac{1}{n}   \sum_{i=1}^n (X_i - \bar X)^2,
+\qquad
+\sigma_{n-1}^2 = \frac{1}{n-1} \sum_{i=1}^n (X_i - \bar X)^2.
+$$
+
+#### Step 1: Compute $\mathbb{E}\!\left[\sum_{i=1}^n (X_i - \bar X)^2\right]$
+
+First we use the identity $$
+\sum_{i=1}^n (X_i - \bar X)^2
+= \sum_{i=1}^n X_i^2 - n \bar X^2.
+$$
+
+Taking expectations: $$
+\mathbb{E}\left[\sum_{i=1}^n (X_i - \bar X)^2\right]
+= \mathbb{E}\left[\sum_{i=1}^n X_i^2\right] - n\,\mathbb{E}[\bar X^2].
+$$
+
+For each $X_i$, $$
+\mathbb{E}[X_i^2] = \mathrm{Var}(X_i) + (\mathbb{E}[X_i])^2
+= \sigma^2 + \mu^2,
+$$ hence $$
+\mathbb{E}\left[\sum_{i=1}^n X_i^2\right]
+= n(\sigma^2 + \mu^2).
+$$
+
+$$
+\bar X = \frac{1}{n}\sum_{i=1}^n X_i,
+\quad
+\mathbb{E}[\bar X] = \mu,
+\quad
+\mathrm{Var}(\bar X) = \frac{\sigma^2}{n}.
+$$ Therefore $$
+\mathbb{E}[\bar X^2]
+= \mathrm{Var}(\bar X) + (\mathbb{E}[\bar X])^2
+= \frac{\sigma^2}{n} + \mu^2.
+$$
+
+$$
+\begin{aligned}
+\mathbb{E}\left[\sum_{i=1}^n (X_i - \bar X)^2\right]
+&= n(\sigma^2 + \mu^2)
+   - n\left(\frac{\sigma^2}{n} + \mu^2\right) \\
+&= n\sigma^2 + n\mu^2 - \sigma^2 - n\mu^2 \\
+&= (n-1)\sigma^2.
+\end{aligned}
+$$
+
+Thus we have the key result: $$
+\boxed{
+\mathbb{E}\left[\sum_{i=1}^n (X_i - \bar X)^2\right]
+= (n-1)\sigma^2
+}.
+$$
+
+#### Step 2: Expected value of $\sigma_n^2$
+
+By definition, $$
+\sigma_n^2 = \frac{1}{n} \sum_{i=1}^n (X_i - \bar X)^2.
+$$
+
+$$
+\mathbb{E}[\sigma_n^2]
+= \frac{1}{n}\,
+  \mathbb{E}\left[\sum_{i=1}^n (X_i - \bar X)^2\right]
+= \frac{1}{n}\,(n-1)\sigma^2
+= \frac{n-1}{n}\,\sigma^2.
+$$
+
+$$
+\boxed{
+\mathbb{E}[\sigma_n^2]
+= \left(1 - \frac{1}{n}\right)\sigma^2
+}.
+$$
+
+The bias of this estimator is $$
+\mathrm{Bias}(\sigma_n^2)
+= \mathbb{E}[\sigma_n^2] - \sigma^2
+= \left(\frac{n-1}{n} - 1\right)\sigma^2
+= -\frac{\sigma^2}{n} < 0.
+$$
+
+So $\sigma_n^2$ is a **biased** estimator.
+
+#### Step 3: Expected value of $\sigma_{n-1}^2$
+
+$$
+\sigma_{n-1}^2 = \frac{1}{n-1} \sum_{i=1}^n (X_i - \bar X)^2.
+$$
+
+$$
+\mathbb{E}[\sigma_{n-1}^2]
+= \frac{1}{n-1}\,
+  \mathbb{E}\left[\sum_{i=1}^n (X_i - \bar X)^2\right]
+= \frac{1}{n-1} \,(n-1)\sigma^2
+= \sigma^2.
+$$
+
+$$
+\boxed{
+\mathbb{E}[\sigma_{n-1}^2] = \sigma^2
+}.
+$$
+
+Therefore the bias of $\sigma_{n-1}^2$ is $$
+\mathrm{Bias}(\sigma_{n-1}^2)
+= \mathbb{E}[\sigma_{n-1}^2] - \sigma^2
+= 0,
+$$ so this estimator is **unbiased**.
+
+#### Conclusion
+
+-   The estimator $$
+    \sigma_n^2 = \frac{1}{n} \sum_{i=1}^n (X_i - \bar X)^2
+    $$ has $\mathbb{E}[\sigma_n^2] = \dfrac{n-1}{n}\sigma^2$, so it is biased with $\mathrm{Bias}(\sigma_n^2) = -\dfrac{\sigma^2}{n}$.
+
+-   The estimator $$
+    \sigma_{n-1}^2 = \frac{1}{n-1} \sum_{i=1}^n (X_i - \bar X)^2
+    $$ satisfies $\mathbb{E}[\sigma_{n-1}^2] = \sigma^2$.
