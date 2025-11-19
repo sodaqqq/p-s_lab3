@@ -1,0 +1,34 @@
+---
+title: "LAB 3"
+output: html_notebook
+---
+
+# Lab assignment 3
+
+## Team
+
+*Ostap Kostiuk, Anastasia Yablunovska, Sofiia Vitchynkina*
+
+## Work distribuition
+
+**Task 1** - Sofiia Vitchynkina\
+**Task 2** - Anastasia Yablunovska\
+**Task 3** - Ostap Kostiuk
+
+# Task 1
+
+task ...
+
+solution ...
+
+# Task 2
+
+task ...
+
+solution ...
+
+# Task 3
+
+task ...
+
+solution ...
