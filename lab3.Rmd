@@ -23,9 +23,277 @@ solution ...
 
 # Task 2
 
-task ...
+**Task**: 
 
-solution ...
+In this task, we study the construction of confidence intervals for the parameter θ of a Poisson distribution X∼Pois(θ).
+The goal is to verify empirically that the confidence intervals constructed using methods (2)–(4) from Problem 1 indeed contain the true parameter with probability approximately equal to the nominal confidence level 1−a.
+We also compare the precision of these intervals by analysing their average lengths.
+For our team, the ID number is 16
+
+**Solution**:
+
+
+```{r}
+set.seed(16)
+
+# True parameter value
+id_num <- 16
+theta_true <- id_num / 10
+
+cat("True parameter theta:", theta_true, "\n")
+
+n_demo <- 50
+M_demo <- 5000
+sample_means_demo <- replicate(M_demo, mean(rpois(n_demo, lambda = theta_true)))
+hist(sample_means_demo,
+breaks = 40,
+main = "Distribution of Sample Means (n = 50)",
+xlab = "Sample Mean",
+col = "lightblue",
+border = "white")
+
+```
+Before constructing confidence intervals, we visualize the empirical distribution of the sample mean for n=50.
+As expected from the central limit theorem, the distribution is approximately normal, which supports the use of normal and t-based approximations in the following methods.
+
+
+## Method 2: Normal Approximation with Known Variance
+
+For Poisson distribution P(θ), we have E[X] = θ and Var(X) = θ.
+
+The Z-statistic is:
+$$Z = \frac{\sqrt{n}(\bar{X} - \theta)}{\sqrt{\theta}} \sim N(0,1)$$
+
+From this we get:
+$$P(|\bar{X} - \theta| \leq z_\beta \sqrt{\theta/n}) = 2\beta - 1$$
+
+The confidence interval (uses unknown θ) is:
+$$\bar{X} \pm z_\beta \sqrt{\theta/n}$$
+
+```{r}
+method2_ci <- function(sample_mean, theta_true, n, alpha) {
+  z_beta <- qnorm(1 - alpha/2)
+  half_width <- z_beta * sqrt(theta_true / n)
+  lower <- sample_mean - half_width
+  upper <- sample_mean + half_width
+  return(c(lower, upper))
+}
+```
+
+
+## Method 3: Normal Approximation Solving for θ
+
+Solving the inequality $|\bar{X} - \theta| \leq z_\beta \sqrt{\theta/n}$ for θ gives a practical CI that doesn't depend on θ:
+
+$$\frac{(\bar{X} + z_\beta^2/(2n)) \pm z_\beta\sqrt{\bar{X}/n + z_\beta^2/(4n^2)}}{1 + z_\beta^2/n}$$
+
+```{r}
+method3_ci <- function(sample_mean, n, alpha) {
+  z <- qnorm(1 - alpha/2)
+  z_sq <- z^2
+  
+  a <- 1
+  b <- -(2 * sample_mean + z_sq / n)
+  c <- sample_mean^2
+  
+  discriminant <- b^2 - 4 * a * c
+  lower <- (-b - sqrt(discriminant)) / (2 * a)
+  upper <- (-b + sqrt(discriminant)) / (2 * a)
+  
+  return(c(lower, upper))
+}
+```
+
+
+## Method 4: Student t-Distribution (with Sample Variance)
+
+Using sample variance to estimate θ and applying t-distribution:
+$$\bar{X} \pm t_{n-1, \beta} \frac{s}{\sqrt{n}}$$
+
+where $s^2$ is the sample variance.
+
+```{r}
+method4_ci <- function(data, alpha) {
+  n <- length(data)
+  sample_mean <- mean(data)
+  sample_sd <- sd(data)
+  
+  t_val <- qt(1 - alpha/2, df = n - 1)
+  half_width <- t_val * sample_sd / sqrt(n)
+  
+  lower <- sample_mean - half_width
+  upper <- sample_mean + half_width
+  
+  return(c(lower, upper))
+}
+```
+
+
+## (a) Verification of Coverage Probability
+
+```{r}
+M <- 10000
+sample_sizes <- c(10, 30, 50, 100, 500)
+alphas <- c(0.1, 0.05, 0.01)
+
+results <- data.frame()
+
+for (alpha in alphas) {
+  conf_level <- 1 - alpha
+  
+  for (n in sample_sizes) {
+    samples_matrix <- matrix(rpois(M * n, lambda = theta_true), nrow = M)
+    sample_means <- rowMeans(samples_matrix)
+    
+    coverage_m2 <- 0
+    lengths_m2 <- numeric(M)
+    
+    coverage_m3 <- 0
+    lengths_m3 <- numeric(M)
+    
+    coverage_m4 <- 0
+    lengths_m4 <- numeric(M)
+    
+    for (i in 1:M) {
+      ci2 <- method2_ci(sample_means[i], theta_true, n, alpha)
+      coverage_m2 <- coverage_m2 + (ci2[1] <= theta_true & theta_true <= ci2[2])
+      lengths_m2[i] <- ci2[2] - ci2[1]
+      
+      ci3 <- method3_ci(sample_means[i], n, alpha)
+      coverage_m3 <- coverage_m3 + (ci3[1] <= theta_true & theta_true <= ci3[2])
+      lengths_m3[i] <- ci3[2] - ci3[1]
+      
+      ci4 <- method4_ci(samples_matrix[i, ], alpha)
+      coverage_m4 <- coverage_m4 + (ci4[1] <= theta_true & theta_true <= ci4[2])
+      lengths_m4[i] <- ci4[2] - ci4[1]
+    }
+    
+    results <- rbind(results, data.frame(
+      alpha = alpha,
+      conf_level = conf_level,
+      n = n,
+      method = "Method 2 (Known θ)",
+      coverage = coverage_m2 / M,
+      mean_length = mean(lengths_m2),
+      median_length = median(lengths_m2)
+    ))
+    
+    results <- rbind(results, data.frame(
+      alpha = alpha,
+      conf_level = conf_level,
+      n = n,
+      method = "Method 3 (Solved)",
+      coverage = coverage_m3 / M,
+      mean_length = mean(lengths_m3),
+      median_length = median(lengths_m3)
+    ))
+    
+    results <- rbind(results, data.frame(
+      alpha = alpha,
+      conf_level = conf_level,
+      n = n,
+      method = "Method 4 (t-dist)",
+      coverage = coverage_m4 / M,
+      mean_length = mean(lengths_m4),
+      median_length = median(lengths_m4)
+    ))
+  }
+}
+
+print(results)
+```
+
+
+## (b) Comparison of Precision (Lengths)
+
+```{r}
+library(ggplot2)
+
+ggplot(results, aes(x = n, y = coverage, color = method, linetype = method)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  geom_hline(aes(yintercept = conf_level), linetype = "dashed", color = "black") +
+  facet_wrap(~ conf_level, labeller = label_both) +
+  labs(
+    title = "Coverage Probability vs Sample Size",
+    subtitle = paste("True θ =", theta_true),
+    x = "Sample Size (n)",
+    y = "Empirical Coverage Probability",
+    color = "Method",
+    linetype = "Method"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+ggplot(results, aes(x = n, y = mean_length, color = method, linetype = method)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ conf_level, labeller = label_both, scales = "free_y") +
+  labs(
+    title = "Mean Confidence Interval Length vs Sample Size",
+    subtitle = paste("True θ =", theta_true),
+    x = "Sample Size (n)",
+    y = "Mean CI Length",
+    color = "Method",
+    linetype = "Method"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+
+## (c) Recommendation
+
+**Summary of Results**:
+
+```{r}
+summary_alpha_05 <- results[results$alpha == 0.05, ]
+
+cat("Summary for α = 0.05 (95% confidence level):\n\n")
+
+for (n_val in unique(summary_alpha_05$n)) {
+  cat("Sample size n =", n_val, ":\n")
+  subset_data <- summary_alpha_05[summary_alpha_05$n == n_val, ]
+  print(subset_data[, c("method", "coverage", "mean_length")])
+  cat("\n")
+}
+```
+
+**Analysis**:
+
+1. **Method 2 (Known θ)**: 
+   - This method uses the true value of θ, which is not available in practice
+   - It serves as a theoretical benchmark
+   - Coverage probability should be closest to nominal level
+   - Shortest CI length among all methods
+
+2. **Method 3 (Solved for θ)**:
+   - Practical method that doesn't require knowing θ
+   - Obtained by solving the inequality algebraically
+   - Coverage probability may be slightly lower than nominal for small n
+   - CI length is longer than Method 2 but still efficient
+
+3. **Method 4 (Student t-distribution)**:
+   - Most conservative and practical approach
+   - Uses sample variance to estimate θ
+   - Generally provides coverage ≥ nominal level
+   - Wider intervals, especially for small n
+
+**Recommendation**:
+
+- **For small samples (n < 30)**: Use **Method 4** (Student t-distribution) as it provides more reliable coverage and accounts for estimation uncertainty in the variance.
+
+- **For moderate to large samples (n ≥ 30)**: Use **Method 3** (solved CI) as it's practical, doesn't require knowing θ, and provides good coverage with reasonable precision.
+
+- **Method 2** should not be used in practice since θ is unknown, but it's useful for theoretical comparisons.
+
+**Conclusion**:
+
+The simulation confirms that:
+- All three methods achieve coverage probabilities close to the nominal level (1 - α) for sufficiently large samples
+- As sample size increases, all methods converge in performance
+- Method 4 is most robust for small samples but gives wider intervals
+- Method 3 provides a good balance between coverage and precision for practical use
 
 # Task 3
 
