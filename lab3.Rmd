@@ -17,9 +17,144 @@ output: html_notebook
 
 # Task 1
 
-task ...
+# Estimating the parameter θ of the exponential distribution
 
-solution ...
+## 1. Problem statement
+
+We have a sample from an exponential distribution. The mean of this distribution equals the parameter θ, which we want to estimate.
+
+We build 4 different confidence intervals for θ and evaluate:
+
+- how often these intervals contain the true parameter value;
+- the average interval length;
+- which method is the most accurate and stable.
+
+---
+
+# 2. Explanation of methods
+
+### Method 1: Exact chi-square interval
+This method uses a key theoretical property of the exponential distribution: a specific transformation of the sample mean follows a chi-square distribution with 2n degrees of freedom. Because of this exact relationship, we can invert the chi-square bounds and obtain a confidence interval for θ without any approximations.
+
+### Method 2: Normal approximation
+This method uses the Central Limit Theorem: the sample mean becomes approximately normal when the sample size is large.This method treats the sample mean as approximately normally distributed when the sample size is large. It builds a confidence interval by taking the sample mean and adding/subtracting a margin based on this normal approximation.
+
+### Method 3: Interval without θ
+This method starts from the normal-approximation inequality but rearranges it so that θ is isolated. After the algebraic transformation, the resulting confidence interval no longer depends on the unknown parameter and can be computed directly from the sample mean.
+
+### Method 4: t-interval using sample SD
+This method replaces the unknown parameter θ in the variance with the sample standard deviation s. After this substitution, the distribution of the standardized sample mean is approximated using the Student’s t-distribution, which adjusts for estimating variability from the data.
+
+# 3. Simulation parameters
+```{r}
+id <- 16
+theta <- id / 10      
+lambda <- 1 / theta   
+
+set.seed(id)
+
+alpha_vals <- c(0.1, 0.05, 0.01)
+n_vals <- c(10, 30, 100)
+m <- 1000
+```
+
+---
+
+# 4. Simulation and interval construction
+
+```{r}
+results <- data.frame()
+
+for (n in n_vals) {
+  for (alpha in alpha_vals) {
+
+    cover1 <- cover2 <- cover3 <- cover4 <- 0
+    len1_sum <- len2_sum <- len3_sum <- len4_sum <- 0
+
+    z <- qnorm(1 - alpha/2)
+    t_val <- qt(1 - alpha/2, df = n - 1)
+    df_chi <- 2 * n
+
+    for (i in 1:m) {
+      x <- rexp(n, rate = lambda)
+      xbar <- mean(x)
+      s <- sd(x)
+
+      # Method 1: exact chi-square
+      chi_low <- qchisq(alpha/2, df = df_chi)
+      chi_up  <- qchisq(1 - alpha/2, df = df_chi)
+      ci1_lower <- 2 * n * xbar / chi_up
+      ci1_upper <- 2 * n * xbar / chi_low
+      len1 <- ci1_upper - ci1_lower
+      if (theta >= ci1_lower && theta <= ci1_upper) cover1 <- cover1 + 1
+      len1_sum <- len1_sum + len1
+
+      # Method 2: normal approximation
+      ci2_lower <- xbar - z * theta / sqrt(n)
+      ci2_upper <- xbar + z * theta / sqrt(n)
+      len2 <- ci2_upper - ci2_lower
+      if (theta >= ci2_lower && theta <= ci2_upper) cover2 <- cover2 + 1
+      len2_sum <- len2_sum + len2
+
+      # Method 3: rearranged inequality
+      factor <- z / sqrt(n)
+      ci3_lower <- xbar / (1 + factor)
+      ci3_upper <- xbar / (1 - factor)
+      len3 <- ci3_upper - ci3_lower
+      if (theta >= ci3_lower && theta <= ci3_upper) cover3 <- cover3 + 1
+      len3_sum <- len3_sum + len3
+
+      # Method 4: t-interval
+      se <- s / sqrt(n)
+      ci4_lower <- xbar - t_val * se
+      ci4_upper <- xbar + t_val * se
+      len4 <- ci4_upper - ci4_lower
+      if (theta >= ci4_lower && theta <= ci4_upper) cover4 <- cover4 + 1
+      len4_sum <- len4_sum + len4
+    }
+
+    results <- rbind(
+      results,
+      data.frame(n=n, alpha=alpha, method="chi2_exact", coverage=cover1/m, mean_length=len1_sum/m),
+      data.frame(n=n, alpha=alpha, method="normal_known_theta", coverage=cover2/m, mean_length=len2_sum/m),
+      data.frame(n=n, alpha=alpha, method="rearranged_no_theta", coverage=cover3/m, mean_length=len3_sum/m),
+      data.frame(n=n, alpha=alpha, method="t_interval", coverage=cover4/m, mean_length=len4_sum/m)
+    )
+  }
+}
+
+results
+```
+
+---
+
+# 5. Analysis of simulation results
+
+### Coverage
+- The exact chi-square interval matches the nominal confidence level most accurately.
+- The normal approximation interval performs poorly at small sample sizes.
+- The interval without θ behaves reasonably well but tends to be wider.
+- The t-interval works acceptably for medium n but does not account for the distribution's asymmetry.
+
+### Interval length
+- The normal interval is the shortest, but at the cost of poor coverage.
+- The t-interval provides a balanced interval length.
+- The chi-square interval is sometimes longer but theoretically exact.
+
+---
+
+# 6. Conclusion
+
+**The exact chi-square interval is the best method**, because it:
+
+- is stable for any sample size;
+- guarantees correct coverage;
+- does not rely on approximations.
+
+Other methods may be used as approximations but should not be the main choice for exponential data.
+
+
+
 
 # Task 2
 
